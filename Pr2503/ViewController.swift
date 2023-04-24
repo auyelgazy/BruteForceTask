@@ -4,17 +4,18 @@ final class ViewController: UIViewController {
 
     // MARK: - UI
 
-    @IBOutlet weak var label: UILabel!
-    @IBOutlet weak var textField: UITextField!
-    @IBOutlet weak var button: UIButton!
-    @IBOutlet weak var startButton: UIButton!
-    @IBOutlet weak var stopButton: UIButton!
-    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
+    @IBOutlet private weak var label: UILabel!
+    @IBOutlet private weak var textField: UITextField!
+    @IBOutlet private weak var button: UIButton!
+    @IBOutlet private weak var startButton: UIButton!
+    @IBOutlet private weak var stopButton: UIButton!
+    @IBOutlet private weak var activityIndicator: UIActivityIndicatorView!
 
     // MARK: - Properties
 
-    var isSearching = false
-    var isBlack: Bool = false {
+    private let bruteForce = BruteForce()
+    private var isSearching = false
+    private var isBlack: Bool = false {
         didSet {
             if isBlack {
                 self.view.backgroundColor = .darkGray
@@ -44,23 +45,24 @@ final class ViewController: UIViewController {
 
     // MARK: - Actions
 
-    @IBAction func changeBackgroundButton(_ sender: Any) {
+    @IBAction private func changeBackgroundButton(_ sender: Any) {
         isBlack.toggle()
     }
 
-    @IBAction func startPressed(_ sender: UIButton) {
+    @IBAction private func startPressed(_ sender: UIButton) {
+        if isSearching { return }
         guard let password = textField.text else { return }
-        if password == "" { return }
+        guard !password.isEmpty else { return }
         activityIndicator.startAnimating()
         bruteForce(passwordToUnlock: password)
     }
 
-    @IBAction func stopPressed(_ sender: UIButton) {
+    @IBAction private func stopPressed(_ sender: UIButton) {
         isSearching = false
     }
 
     private func bruteForce(passwordToUnlock: String) {
-        let ALLOWED_CHARACTERS:   [String] = String().printable.map { String($0) }
+        let allowedCharacters: [String] = String().printable.map { String($0) }
 
         var password: String = ""
         isSearching = true
@@ -68,67 +70,25 @@ final class ViewController: UIViewController {
         let queue = DispatchQueue(label: "queue", qos: .userInitiated)
         queue.async {
             while password != passwordToUnlock && self.isSearching {
-                password = self.generateBruteForce(password, fromArray: ALLOWED_CHARACTERS)
+                password = self.bruteForce.generateBruteForce(password, fromArray: allowedCharacters)
 
                 DispatchQueue.main.async {
                     self.label.text = password
                 }
             }
+            self.endBruteForce(password, passwordToUnlock)
+        }
+    }
 
-            DispatchQueue.main.async {
-                if password == passwordToUnlock {
-                    self.label.text = "Password: \(password)"
-                } else {
-                    self.label.text = "Password not found"
-                }
-                self.activityIndicator.stopAnimating()
+    private func endBruteForce(_ password: String, _ passwordToUnlock: String) {
+        DispatchQueue.main.async {
+            if password == passwordToUnlock {
+                self.label.text = "Password: \(password)"
+            } else {
+                self.label.text = "Password not found"
             }
+            self.activityIndicator.stopAnimating()
+            self.isSearching = false
         }
-    }
-
-    private func indexOf(character: Character, _ array: [String]) -> Int {
-        return array.firstIndex(of: String(character))!
-    }
-
-    private func characterAt(index: Int, _ array: [String]) -> Character {
-        return index < array.count ? Character(array[index])
-        : Character("")
-    }
-
-    private func generateBruteForce(_ string: String, fromArray array: [String]) -> String {
-        var str: String = string
-
-        if str.count <= 0 {
-            str.append(characterAt(index: 0, array))
-        }
-        else {
-            str.replace(at: str.count - 1,
-                        with: characterAt(index: (indexOf(character: str.last!, array) + 1) % array.count, array))
-
-            if indexOf(character: str.last!, array) == 0 {
-                str = String(generateBruteForce(String(str.dropLast()), fromArray: array)) + String(str.last!)
-            }
-        }
-
-        return str
-    }
-}
-
-// MARK: - Extensions
-
-extension String {
-    var digits:      String { return "0123456789" }
-    var lowercase:   String { return "abcdefghijklmnopqrstuvwxyz" }
-    var uppercase:   String { return "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
-    var punctuation: String { return "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~" }
-    var letters:     String { return lowercase + uppercase }
-    var printable:   String { return digits + letters + punctuation }
-
-
-
-    mutating func replace(at index: Int, with character: Character) {
-        var stringArray = Array(self)
-        stringArray[index] = character
-        self = String(stringArray)
     }
 }
