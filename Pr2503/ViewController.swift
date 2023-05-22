@@ -1,91 +1,94 @@
 import UIKit
 
-class ViewController: UIViewController {
-    @IBOutlet weak var button: UIButton!
-    
-    var isBlack: Bool = false {
+final class ViewController: UIViewController {
+
+    // MARK: - UI
+
+    @IBOutlet private weak var label: UILabel!
+    @IBOutlet private weak var textField: UITextField!
+    @IBOutlet private weak var button: UIButton!
+    @IBOutlet private weak var startButton: UIButton!
+    @IBOutlet private weak var stopButton: UIButton!
+    @IBOutlet private weak var activityIndicator: UIActivityIndicatorView!
+
+    // MARK: - Properties
+
+    private let bruteForce = BruteForce()
+    private var isSearching = false
+    private var isBlack: Bool = false {
         didSet {
             if isBlack {
-                self.view.backgroundColor = .black
+                self.view.backgroundColor = .darkGray
+                label.textColor = .white
             } else {
-                self.view.backgroundColor = .white
+                self.view.backgroundColor = .lightGray
+                label.textColor = .black
             }
         }
     }
-    
-    @IBAction func onBut(_ sender: Any) {
-        isBlack.toggle()
-    }
-    
+
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        
-        self.bruteForce(passwordToUnlock: "1!gr")
-        
-        // Do any additional setup after loading the view.
+        setupOutlets()
     }
-    
-    func bruteForce(passwordToUnlock: String) {
-        let ALLOWED_CHARACTERS:   [String] = String().printable.map { String($0) }
+
+    // MARK: - Setup
+
+    private func setupOutlets() {
+        textField.isSecureTextEntry = true
+        button.backgroundColor = .systemOrange
+        startButton.backgroundColor = .systemGreen
+        stopButton.backgroundColor = .systemRed
+    }
+
+    // MARK: - Actions
+
+    @IBAction private func changeBackgroundButton(_ sender: Any) {
+        isBlack.toggle()
+    }
+
+    @IBAction private func startPressed(_ sender: UIButton) {
+        if isSearching { return }
+        guard let password = textField.text else { return }
+        guard !password.isEmpty else { return }
+        activityIndicator.startAnimating()
+        bruteForce(passwordToUnlock: password)
+    }
+
+    @IBAction private func stopPressed(_ sender: UIButton) {
+        isSearching = false
+    }
+
+    private func bruteForce(passwordToUnlock: String) {
+        let allowedCharacters: [String] = String().printable.map { String($0) }
 
         var password: String = ""
+        isSearching = true
 
-        // Will strangely ends at 0000 instead of ~~~
-        while password != passwordToUnlock { // Increase MAXIMUM_PASSWORD_SIZE value for more
-            password = generateBruteForce(password, fromArray: ALLOWED_CHARACTERS)
-//             Your stuff here
-            print(password)
-            // Your stuff here
-        }
-        
-        print(password)
-    }
-}
+        let queue = DispatchQueue(label: "queue", qos: .userInitiated)
+        queue.async {
+            while password != passwordToUnlock && self.isSearching {
+                password = self.bruteForce.generateBruteForce(password, fromArray: allowedCharacters)
 
-
-
-extension String {
-    var digits:      String { return "0123456789" }
-    var lowercase:   String { return "abcdefghijklmnopqrstuvwxyz" }
-    var uppercase:   String { return "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
-    var punctuation: String { return "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~" }
-    var letters:     String { return lowercase + uppercase }
-    var printable:   String { return digits + letters + punctuation }
-
-
-
-    mutating func replace(at index: Int, with character: Character) {
-        var stringArray = Array(self)
-        stringArray[index] = character
-        self = String(stringArray)
-    }
-}
-
-func indexOf(character: Character, _ array: [String]) -> Int {
-    return array.firstIndex(of: String(character))!
-}
-
-func characterAt(index: Int, _ array: [String]) -> Character {
-    return index < array.count ? Character(array[index])
-                               : Character("")
-}
-
-func generateBruteForce(_ string: String, fromArray array: [String]) -> String {
-    var str: String = string
-
-    if str.count <= 0 {
-        str.append(characterAt(index: 0, array))
-    }
-    else {
-        str.replace(at: str.count - 1,
-                    with: characterAt(index: (indexOf(character: str.last!, array) + 1) % array.count, array))
-
-        if indexOf(character: str.last!, array) == 0 {
-            str = String(generateBruteForce(String(str.dropLast()), fromArray: array)) + String(str.last!)
+                DispatchQueue.main.async {
+                    self.label.text = password
+                }
+            }
+            self.endBruteForce(password, passwordToUnlock)
         }
     }
 
-    return str
+    private func endBruteForce(_ password: String, _ passwordToUnlock: String) {
+        DispatchQueue.main.async {
+            if password == passwordToUnlock {
+                self.label.text = "Password: \(password)"
+            } else {
+                self.label.text = "Password not found"
+            }
+            self.activityIndicator.stopAnimating()
+            self.isSearching = false
+        }
+    }
 }
-
